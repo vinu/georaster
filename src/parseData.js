@@ -1,7 +1,7 @@
-import {fromArrayBuffer, fromUrl, fromBlob} from 'geotiff';
-import {getPalette} from 'geotiff-palette';
+import { fromArrayBuffer, fromUrl, fromBlob } from 'geotiff';
+import { getPalette } from 'geotiff-palette';
 import calcImageStats from 'calc-image-stats';
-import {unflatten} from './utils.js';
+import { unflatten } from './utils.js';
 
 function processResult(result) {
   const stats = calcImageStats(result.values, {
@@ -85,11 +85,12 @@ export default function parseData(data, debug) {
               result.pixelHeight = Math.abs(resolutionY);
               result.pixelWidth = Math.abs(resolutionX);
 
-              const [originX, originY] = image.getOrigin();
-              result.xmin = originX;
-              result.xmax = result.xmin + width * result.pixelWidth;
-              result.ymax = originY;
-              result.ymin = result.ymax - height * result.pixelHeight;
+              const [xmin, ymin, xmax, ymax] = image.getBoundingBox();
+
+              result.xmin = xmin;
+              result.xmax = xmax;
+              result.ymax = ymax;
+              result.ymin = ymin;
 
               result.noDataValue = fileDirectory.GDAL_NODATA ? parseFloat(fileDirectory.GDAL_NODATA) : null;
 
@@ -102,7 +103,7 @@ export default function parseData(data, debug) {
               if (!data.readOnDemand) {
                 return image.readRasters().then(rasters => {
                   result.values = rasters.map(valuesInOneDimension => {
-                    return unflatten(valuesInOneDimension, {height, width});
+                    return unflatten(valuesInOneDimension, { height, width });
                   });
                   return processResult(result);
                 });
