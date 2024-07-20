@@ -23,7 +23,7 @@ onmessage = e => {
     postMessage(result, transferBuffers);
     close();
   }).catch(error => {
-    postMessage({ error });
+    postMessage({error});
     close();
   });
 };

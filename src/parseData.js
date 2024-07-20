@@ -1,7 +1,7 @@
-import { fromArrayBuffer, fromUrl, fromBlob } from 'geotiff';
-import { getPalette } from 'geotiff-palette';
+import {fromArrayBuffer, fromUrl, fromBlob} from 'geotiff';
+import {getPalette} from 'geotiff-palette';
 import calcImageStats from 'calc-image-stats';
-import { unflatten } from './utils.js';
+import {unflatten} from './utils.js';
 
 function processResult(result) {
   const stats = calcImageStats(result.values, {
@@ -18,6 +18,56 @@ function processResult(result) {
   result.ranges = stats.bands.map(band => band.range);
 
   return result;
+}
+
+// Copied from : https://github.com/geotiffjs/geotiff.js/blob/master/src/geotiffimage.js#L906
+function getBoundingBox(image, tilegrid = false) {
+  const height = image.getHeight();
+  const width = image.getWidth();
+  const fileDirectory = image.fileDirectory;
+
+  if (fileDirectory.ModelTransformation && !tilegrid) {
+    // eslint-disable-next-line no-unused-vars
+    const [a, b, c, d, e, f, g, h] = fileDirectory.ModelTransformation;
+
+    const corners = [
+      [0, 0],
+      [0, height],
+      [width, 0],
+      [width, height],
+    ];
+
+    const projected = corners.map(([I, J]) => [
+      d + (a * I) + (b * J),
+      h + (e * I) + (f * J),
+    ]);
+
+    const xs = projected.map((pt) => pt[0]);
+    const ys = projected.map((pt) => pt[1]);
+
+    return [
+      Math.min(...xs),
+      Math.min(...ys),
+      Math.max(...xs),
+      Math.max(...ys),
+    ];
+  } else {
+    const origin = image.getOrigin();
+    const resolution = image.getResolution();
+
+    const x1 = origin[0];
+    const y1 = origin[1];
+
+    const x2 = x1 + (resolution[0] * width);
+    const y2 = y1 + (resolution[1] * height);
+
+    return [
+      Math.min(x1, x2),
+      Math.min(y1, y2),
+      Math.max(x1, x2),
+      Math.max(y1, y2),
+    ];
+  }
 }
 
 /* We're not using async because trying to avoid dependency on babel's polyfill
@@ -85,7 +135,9 @@ export default function parseData(data, debug) {
               result.pixelHeight = Math.abs(resolutionY);
               result.pixelWidth = Math.abs(resolutionX);
 
-              const [xmin, ymin, xmax, ymax] = image.getBoundingBox();
+              const [xmin, ymin, xmax, ymax] = getBoundingBox(image);
+
+              if (debug) console.log('bounding box:', [xmin, ymin, xmax, ymax]);
 
               result.xmin = xmin;
               result.xmax = xmax;
@@ -103,7 +155,7 @@ export default function parseData(data, debug) {
               if (!data.readOnDemand) {
                 return image.readRasters().then(rasters => {
                   result.values = rasters.map(valuesInOneDimension => {
-                    return unflatten(valuesInOneDimension, { height, width });
+                    return unflatten(valuesInOneDimension, {height, width});
                   });
                   return processResult(result);
                 });
